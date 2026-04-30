@@ -18,7 +18,7 @@
 - Telegram bot token
 - 你的 Telegram chat id
 - Docker 用法：Python 3.11+ 或 Docker
-- Cloudflare 用法：Node.js 20+、Wrangler、Cloudflare KV namespace
+- Cloudflare 用法：Bun、Wrangler、Cloudflare KV namespace
 
 ## 建立 Telegram bot
 
@@ -114,13 +114,13 @@ Cloudflare Worker 不會長駐，而是靠 Cron Triggers 執行：
 ### 安裝工具
 
 ```bash
-npm install
+bun install
 ```
 
 ### 建立 KV namespace
 
 ```bash
-npx wrangler kv namespace create HKO_BOT_STATE
+bunx wrangler kv namespace create HKO_BOT_STATE
 ```
 
 把輸出的 `id` 填入 `wrangler.toml`：
@@ -134,18 +134,18 @@ id = "你的_kv_namespace_id"
 ### 設定 Telegram secret
 
 ```bash
-npx wrangler secret put TELEGRAM_BOT_TOKEN
+bunx wrangler secret put TELEGRAM_BOT_TOKEN
 ```
 
 `TELEGRAM_CHAT_ID` 可直接放在 `wrangler.toml` 的 `[vars]`，或你也可以改用 secret：
 
 ```bash
-npx wrangler secret put TELEGRAM_CHAT_ID
+bunx wrangler secret put TELEGRAM_CHAT_ID
 ```
 
 ### 檢查與部署
 
 ```bash
-npm run worker:typecheck
-npm run worker:deploy
+bun run worker:typecheck
+bun run worker:deploy
 ```

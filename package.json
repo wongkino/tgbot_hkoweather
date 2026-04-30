@@ -4,6 +4,7 @@
   "description": "Hong Kong Observatory weather Telegram bot for Cloudflare Workers and Docker.",
   "private": true,
   "type": "module",
+  "packageManager": "bun@1.3.13",
   "scripts": {
     "worker:typecheck": "tsc --noEmit",
     "worker:dev": "wrangler dev",
