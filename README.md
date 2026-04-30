@@ -27,7 +27,7 @@
 ## 本機啟動
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
@@ -43,7 +43,7 @@ TELEGRAM_CHAT_ID=replace_with_your_chat_id
 啟動：
 
 ```bash
-python -m hkoweather_bot.main
+python3 -m hkoweather_bot.main
 ```
 
 ## 設定

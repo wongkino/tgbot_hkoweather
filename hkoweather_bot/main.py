@@ -42,7 +42,7 @@ class WeatherBot:
             return
 
         self.state.set("last_warning_signature", snapshot.signature)
-        if snapshot.has_active_warning:
+        if snapshot.has_notification:
             self.telegram.send_message(build_warning_message(snapshot))
         else:
             self.telegram.send_message("香港天文台特別天氣警告已取消。")

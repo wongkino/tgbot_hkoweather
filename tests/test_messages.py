@@ -24,7 +24,7 @@ def test_build_warning_message() -> None:
         WarningSnapshot(
             signature="WFIRE:2026-04-30T07:00:00+08:00",
             message="紅色火災危險警告現正生效。",
-            has_active_warning=True,
+            has_notification=True,
         )
     )
 
