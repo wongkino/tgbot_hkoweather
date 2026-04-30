@@ -1,0 +1,28 @@
+{
+  "name": "tgbot-hkoweather",
+  "version": "1.0.0",
+  "description": "Hong Kong Observatory weather Telegram bot for Cloudflare Workers and Docker.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "worker:typecheck": "tsc --noEmit",
+    "worker:dev": "wrangler dev",
+    "worker:deploy": "wrangler deploy"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wongkino/tgbot_hkoweather.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/wongkino/tgbot_hkoweather/issues"
+  },
+  "homepage": "https://github.com/wongkino/tgbot_hkoweather#readme",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260430.1",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.87.0"
+  }
+}

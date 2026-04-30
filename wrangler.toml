@@ -1,0 +1,16 @@
+name = "hko-weather-telegram-bot"
+main = "worker/src/index.ts"
+compatibility_date = "2026-04-30"
+
+[vars]
+TELEGRAM_CHAT_ID = "replace_with_your_chat_id"
+
+[[kv_namespaces]]
+binding = "HKO_BOT_STATE"
+id = "replace_with_your_kv_namespace_id"
+
+[triggers]
+crons = [
+  "0 23 * * *",
+  "*/5 * * * *"
+]
