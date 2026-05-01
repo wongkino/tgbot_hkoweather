@@ -104,6 +104,27 @@ docker compose logs -f hkoweather-bot
 docker compose down
 ```
 
+### Docker Compose 熱啟動 / 開發模式
+
+熱啟動模式會把本機專案掛載到 container，並用 `bun --watch` 監聽 `src/` 變更後自動重啟。
+
+```bash
+cp .env.example .env
+docker compose -f docker-compose.dev.yml up --build
+```
+
+查看 log：
+
+```bash
+docker compose -f docker-compose.dev.yml logs -f hkoweather-bot
+```
+
+停止：
+
+```bash
+docker compose -f docker-compose.dev.yml down
+```
+
 ### Docker
 
 ```bash
@@ -122,6 +143,12 @@ docker run -d --name hko-weather-telegram-bot \
 cp .env.example .env
 bun install
 bun run start
+```
+
+本機熱啟動：
+
+```bash
+bun run start:watch
 ```
 
 ## Cloudflare Workers
