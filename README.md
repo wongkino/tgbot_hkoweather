@@ -5,6 +5,7 @@
 - 每日香港時間 07:00 發送即時天氣報告
 - 定期輪詢香港天文台天氣警告
 - 有新警告、警告內容更新或警告取消時，即時傳送 Telegram 訊息
+- 支援 Telegram Reply Keyboard / 指令手動查詢現在天氣
 
 ## 啟動方式
 
@@ -64,6 +65,27 @@ src/
 | `DAILY_REPORT_TIME` | `07:00` | Docker 長駐模式每日天氣報告時間，格式 `HH:MM`，香港時間 |
 | `WARNING_POLL_SECONDS` | `300` | Docker 長駐模式天氣警告輪詢秒數 |
 | `STATE_FILE` | `.hkoweather_bot_state.json` | Docker 長駐模式記錄上一個警告狀態 |
+
+## Telegram 鍵盤與指令
+
+Bot 會提供 Reply Keyboard，按「現在天氣」即可立即推送天氣。
+
+| 按鈕 / 指令 | 說明 |
+| --- | --- |
+| `現在天氣` | 立即推送現在天氣 |
+| `/weather` | 立即推送現在天氣 |
+| `/now` | 立即推送現在天氣 |
+| `/help` | 顯示鍵盤與說明 |
+
+Docker / Bun 長駐模式會自動用 Telegram `getUpdates` 輪詢鍵盤訊息與指令。
+
+你也可以在 BotFather 用 `/setcommands` 加入：
+
+```text
+weather - 立即取得現在天氣
+now - 立即取得現在天氣
+help - 顯示可用指令
+```
 
 ## Bun Docker / Docker Compose
 
@@ -158,18 +180,18 @@ Cloudflare Worker 不會長駐，而是靠 Cron Triggers 執行：
 - `0 23 * * *`：UTC 23:00，即香港時間每日 07:00，發送每日天氣報告
 - `*/5 * * * *`：每 5 分鐘檢查一次天氣警告
 
-### 建立 KV namespace
+### KV namespace
 
-```bash
-bunx wrangler kv namespace create HKO_BOT_STATE
+GitHub Actions 會自動查找或建立 KV namespace：
+
+```text
+tgbot_hkoweather
 ```
 
-把輸出的 `id` 填入 `wrangler.toml`：
+Worker 內的 binding 名稱固定為：
 
-```toml
-[[kv_namespaces]]
-binding = "HKO_BOT_STATE"
-id = "你的_kv_namespace_id"
+```text
+HKO_BOT_STATE
 ```
 
 ### 設定 Telegram secret
@@ -187,17 +209,39 @@ push 到 `main` 時會自動部署到 Cloudflare Workers。你需要先在 GitHu
 | --- | --- |
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API token，需要 Workers deploy 權限 |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account id |
-| `HKO_BOT_STATE_KV_NAMESPACE_ID` | `HKO_BOT_STATE` KV namespace id |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token，workflow 會寫入 Worker secret |
 | `TELEGRAM_CHAT_ID` | 接收訊息的 Telegram chat id，workflow 會寫入 Worker secret |
+| `TELEGRAM_WEBHOOK_SECRET` | 選填；Telegram webhook secret token，設定後 Worker 會驗證 Telegram header |
 
 workflow 會執行：
 
 1. `bun install --frozen-lockfile`
 2. `bun run typecheck`
-3. 生成 CI 用 Wrangler config
-4. 部署 Worker
-5. 用 `wrangler secret put` 更新 Telegram secrets
+3. 自動查找或建立 `tgbot_hkoweather` KV namespace
+4. 生成 CI 用 Wrangler config
+5. 自動產生臨時 `TELEGRAM_WEBHOOK_SETUP_SECRET`
+6. 部署 Worker 並自動讀取部署後的 `workers.dev` URL
+7. 用 `wrangler secret put` 更新 Telegram secrets
+8. 重新部署一次，確保 Worker 使用最新 secrets
+9. 呼叫 Worker 內置 `/telegram/set-webhook` endpoint，由 Worker 自己設定 Telegram webhook
+
+### 設定 Telegram webhook
+
+Cloudflare Workers 版要接收鍵盤訊息與指令，需要把 Telegram webhook 指向 Worker 的 `/telegram/webhook`。GitHub Actions 會自動呼叫 Worker 內置 endpoint 設定；本機也可以手動執行：
+
+```bash
+SETUP_SECRET=$(openssl rand -hex 32)
+printf '%s' "$SETUP_SECRET" | bunx wrangler secret put TELEGRAM_WEBHOOK_SETUP_SECRET
+bun run worker:deploy
+curl -X POST https://<你的_worker_url>/telegram/set-webhook \
+  -H "Authorization: Bearer $SETUP_SECRET"
+```
+
+Worker 會將 Telegram webhook 設定為：
+
+```text
+https://<你的_worker_url>/telegram/webhook
+```
 
 ### 本機 Worker 開發
 
