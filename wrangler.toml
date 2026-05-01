@@ -1,5 +1,5 @@
 name = "hko-weather-telegram-bot"
-main = "worker/src/index.ts"
+main = "src/runtime/cloudflare/index.ts"
 compatibility_date = "2026-04-30"
 
 [vars]

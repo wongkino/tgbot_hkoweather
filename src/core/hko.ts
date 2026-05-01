@@ -1,69 +1,8 @@
-export interface TelegramConfig {
-  botToken: string;
-  chatId: string;
-}
-
-export interface StateStore {
-  get(key: string): Promise<string | null>;
-  put(key: string, value: string): Promise<void>;
-}
-
-interface CurrentWeather {
-  temperature: string;
-  humidity: string;
-  uvIndex: string;
-  rainfall: string;
-  updateTime: string;
-  warningMessage: string;
-}
-
-interface WarningSnapshot {
-  signature: string;
-  message: string;
-  hasNotification: boolean;
-}
+import type { CurrentWeather, WarningSnapshot } from "./types";
 
 const HKO_BASE_URL = "https://data.weather.gov.hk/weatherAPI/opendata/weather.php";
-export const LAST_WARNING_SIGNATURE_KEY = "last_warning_signature";
 
-export async function sendDailyWeather(telegram: TelegramConfig): Promise<void> {
-  const weather = await getCurrentWeather();
-  await sendTelegramMessage(telegram, buildDailyWeatherMessage(weather));
-}
-
-export async function checkWarnings(
-  telegram: TelegramConfig,
-  state: StateStore,
-): Promise<void> {
-  const snapshot = await getWarningSnapshot();
-  const lastSignature = (await state.get(LAST_WARNING_SIGNATURE_KEY)) ?? "";
-
-  if (snapshot.signature === lastSignature) {
-    return;
-  }
-
-  await state.put(LAST_WARNING_SIGNATURE_KEY, snapshot.signature);
-  if (snapshot.hasNotification) {
-    await sendTelegramMessage(telegram, buildWarningMessage(snapshot));
-  } else {
-    await sendTelegramMessage(telegram, "香港天文台特別天氣警告已取消。");
-  }
-}
-
-async function hkoJson<T>(dataType: string): Promise<T> {
-  const url = new URL(HKO_BASE_URL);
-  url.searchParams.set("dataType", dataType);
-  url.searchParams.set("lang", "tc");
-
-  const response = await fetch(url.toString());
-  if (!response.ok) {
-    throw new Error(`HKO API ${dataType} failed with ${response.status}`);
-  }
-
-  return response.json() as Promise<T>;
-}
-
-async function getCurrentWeather(): Promise<CurrentWeather> {
+export async function getCurrentWeather(): Promise<CurrentWeather> {
   const data = await hkoJson<Record<string, unknown>>("rhrread");
 
   return {
@@ -76,7 +15,7 @@ async function getCurrentWeather(): Promise<CurrentWeather> {
   };
 }
 
-async function getWarningSnapshot(): Promise<WarningSnapshot> {
+export async function getWarningSnapshot(): Promise<WarningSnapshot> {
   const activeWarnings = await hkoJson<Record<string, unknown>>("warnsum");
   const warningInfo = await hkoJson<Record<string, unknown>>("warningInfo");
   const lines: string[] = [];
@@ -89,6 +28,7 @@ async function getWarningSnapshot(): Promise<WarningSnapshot> {
       if (!item) {
         continue;
       }
+
       const name = String(item.name || code);
       const actionCode = String(item.actionCode || "");
       const issueTime = String(item.issueTime || "");
@@ -112,7 +52,10 @@ async function getWarningSnapshot(): Promise<WarningSnapshot> {
       continue;
     }
 
-    const text = detail.contents.map((content) => String(content).trim()).filter(Boolean).join("\n");
+    const text = detail.contents
+      .map((content) => String(content).trim())
+      .filter(Boolean)
+      .join("\n");
     if (!text) {
       continue;
     }
@@ -133,43 +76,17 @@ async function getWarningSnapshot(): Promise<WarningSnapshot> {
   };
 }
 
-function buildDailyWeatherMessage(weather: CurrentWeather): string {
-  return [
-    "香港天文台每日天氣報告",
-    `更新時間：${weather.updateTime}`,
-    "",
-    `氣溫：${weather.temperature}`,
-    `相對濕度：${weather.humidity}`,
-    `紫外線指數：${weather.uvIndex}`,
-    `雨量：${weather.rainfall}`,
-    "",
-    "特別天氣提示：",
-    weather.warningMessage,
-  ].join("\n");
-}
+async function hkoJson<T>(dataType: string): Promise<T> {
+  const url = new URL(HKO_BASE_URL);
+  url.searchParams.set("dataType", dataType);
+  url.searchParams.set("lang", "tc");
 
-function buildWarningMessage(snapshot: WarningSnapshot): string {
-  if (!snapshot.message) {
-    return "香港天文台天氣警告已取消或暫無特別天氣提示。";
-  }
-
-  return ["香港天文台特別天氣警告更新", "", snapshot.message].join("\n");
-}
-
-async function sendTelegramMessage(config: TelegramConfig, text: string): Promise<void> {
-  const response = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      chat_id: config.chatId,
-      text,
-      disable_web_page_preview: true,
-    }),
-  });
-
+  const response = await fetch(url.toString());
   if (!response.ok) {
-    throw new Error(`Telegram sendMessage failed with ${response.status}: ${await response.text()}`);
+    throw new Error(`HKO API ${dataType} failed with ${response.status}`);
   }
+
+  return response.json() as Promise<T>;
 }
 
 function formatTemperature(raw: unknown): string {
@@ -239,7 +156,10 @@ function formatWeatherWarningMessage(raw: unknown): string {
     return "沒有特別天氣提示";
   }
 
-  const text = raw.map((item) => String(item).trim()).filter(Boolean).join("\n");
+  const text = raw
+    .map((item) => String(item).trim())
+    .filter(Boolean)
+    .join("\n");
   return text || "沒有特別天氣提示";
 }
 

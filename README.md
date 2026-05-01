@@ -40,6 +40,21 @@ bun install
 bun run typecheck
 ```
 
+## 檔案結構
+
+```text
+src/
+  core/                 # 共用 bot 邏輯，Cloudflare 與 Docker 都會使用
+    hko.ts              # 香港天文台 Open Data API 讀取與格式化
+    messages.ts         # Telegram 訊息內容
+    telegram.ts         # Telegram Bot API 發送
+    types.ts            # 共用型別與 state store 介面
+    weather-bot.ts      # 每日天氣與警告通知流程
+  runtime/
+    cloudflare/         # Cloudflare Workers 入口
+    docker/             # Bun 長駐 / Docker 入口、設定、排程與檔案 state
+```
+
 ## 設定
 
 | 變數 | 預設值 | 說明 |

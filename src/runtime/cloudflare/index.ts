@@ -1,4 +1,5 @@
-import { checkWarnings, sendDailyWeather, type StateStore } from "../../src/bot";
+import { checkWarnings, sendDailyWeather } from "../../core/weather-bot";
+import type { StateStore, TelegramConfig } from "../../core/types";
 
 interface Env {
   TELEGRAM_BOT_TOKEN: string;
@@ -19,10 +20,7 @@ export default {
 };
 
 async function handleScheduled(cron: string, env: Env): Promise<void> {
-  const telegram = {
-    botToken: env.TELEGRAM_BOT_TOKEN,
-    chatId: env.TELEGRAM_CHAT_ID,
-  };
+  const telegram = telegramConfig(env);
   const state = kvStateStore(env.HKO_BOT_STATE);
 
   if (cron === "0 23 * * *") {
@@ -31,6 +29,13 @@ async function handleScheduled(cron: string, env: Env): Promise<void> {
   }
 
   await checkWarnings(telegram, state);
+}
+
+function telegramConfig(env: Env): TelegramConfig {
+  return {
+    botToken: env.TELEGRAM_BOT_TOKEN,
+    chatId: env.TELEGRAM_CHAT_ID,
+  };
 }
 
 function kvStateStore(kv: KVNamespace): StateStore {
