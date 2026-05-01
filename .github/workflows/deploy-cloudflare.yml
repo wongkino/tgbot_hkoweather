@@ -20,7 +20,6 @@ jobs:
       HKO_BOT_STATE_KV_NAMESPACE_ID: ${{ secrets.HKO_BOT_STATE_KV_NAMESPACE_ID }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      TELEGRAM_WEBHOOK_BASE_URL: ${{ secrets.TELEGRAM_WEBHOOK_BASE_URL }}
       TELEGRAM_WEBHOOK_SETUP_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SETUP_SECRET }}
       TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
 
@@ -46,7 +45,6 @@ jobs:
           test -n "$HKO_BOT_STATE_KV_NAMESPACE_ID"
           test -n "$TELEGRAM_BOT_TOKEN"
           test -n "$TELEGRAM_CHAT_ID"
-          test -n "$TELEGRAM_WEBHOOK_BASE_URL"
           test -n "$TELEGRAM_WEBHOOK_SETUP_SECRET"
 
       - name: Generate Wrangler CI config
@@ -54,11 +52,8 @@ jobs:
           sed "s/replace_with_your_kv_namespace_id/${HKO_BOT_STATE_KV_NAMESPACE_ID}/" wrangler.toml > wrangler.ci.toml
 
       - name: Deploy Worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --config wrangler.ci.toml
+        run: |
+          bunx wrangler deploy --config wrangler.ci.toml
 
       - name: Sync Worker secrets
         run: |
@@ -69,12 +64,22 @@ jobs:
             printf '%s' "$TELEGRAM_WEBHOOK_SECRET" | bunx wrangler secret put TELEGRAM_WEBHOOK_SECRET --config wrangler.ci.toml
           fi
 
+      - name: Redeploy Worker with synced secrets
+        id: deploy
+        run: |
+          bunx wrangler deploy --config wrangler.ci.toml 2>&1 | tee wrangler-deploy.log
+          worker_url="$(awk 'match($0, /https:\/\/[^[:space:]]+\.workers\.dev/) { url=substr($0, RSTART, RLENGTH) } END { print url }' wrangler-deploy.log)"
+          if [ -z "$worker_url" ]; then
+            echo "Unable to determine Worker URL from Wrangler output." >&2
+            exit 1
+          fi
+          echo "worker_url=$worker_url" >> "$GITHUB_OUTPUT"
+
       - name: Set Telegram webhook
         run: |
-          base_url="${TELEGRAM_WEBHOOK_BASE_URL%/}"
           curl --fail-with-body \
             --request POST \
             --header "authorization: Bearer ${TELEGRAM_WEBHOOK_SETUP_SECRET}" \
             --header "content-type: application/json" \
             --data "{}" \
-            "${base_url}/telegram/set-webhook"
+            "${{ steps.deploy.outputs.worker_url }}/telegram/set-webhook"
