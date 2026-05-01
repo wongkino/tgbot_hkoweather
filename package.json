@@ -6,7 +6,8 @@
   "type": "module",
   "packageManager": "bun@1.3.13",
   "scripts": {
-    "worker:typecheck": "tsc --noEmit",
+    "docker:start": "bun run src/docker.ts",
+    "typecheck": "tsc --noEmit",
     "worker:dev": "wrangler dev",
     "worker:deploy": "wrangler deploy"
   },
@@ -23,6 +24,7 @@
   "homepage": "https://github.com/wongkino/tgbot_hkoweather#readme",
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260430.1",
+    "@types/node": "^25.6.0",
     "typescript": "^6.0.3",
     "wrangler": "^4.87.0"
   }

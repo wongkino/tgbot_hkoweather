@@ -6,7 +6,7 @@ services:
     volumes:
       - bot-state:/app/state
     environment:
-      STATE_FILE: /app/state/.hkoweather_bot_state.json
+      STATE_FILE: /app/state/hkoweather-bot-state.json
 
 volumes:
   bot-state:
