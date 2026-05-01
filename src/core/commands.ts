@@ -3,6 +3,13 @@ import { sendTelegramMessage } from "./telegram";
 import type { TelegramConfig, TelegramUpdate } from "./types";
 
 const WEATHER_COMMANDS = new Set(["/weather", "/now"]);
+const WEATHER_BUTTON_TEXT = "現在天氣";
+const HELP_BUTTON_TEXT = "說明";
+const MAIN_KEYBOARD = {
+  keyboard: [[{ text: WEATHER_BUTTON_TEXT }], [{ text: HELP_BUTTON_TEXT }]],
+  resize_keyboard: true,
+  is_persistent: true,
+};
 
 export async function handleTelegramUpdate(
   telegram: TelegramConfig,
@@ -18,13 +25,16 @@ export async function handleTelegramUpdate(
     return false;
   }
 
-  if (isWeatherCommand(text)) {
+  if (isWeatherCommand(text) || text === WEATHER_BUTTON_TEXT.toLowerCase()) {
     await sendCurrentWeather(telegram, message.chat.id);
     return true;
   }
 
-  if (text === "/start" || text === "/help") {
-    await sendTelegramMessage(telegram, buildHelpMessage(), message.chat.id);
+  if (text === "/start" || text === "/help" || text === HELP_BUTTON_TEXT.toLowerCase()) {
+    await sendTelegramMessage(telegram, buildHelpMessage(), {
+      chatId: message.chat.id,
+      replyMarkup: MAIN_KEYBOARD,
+    });
     return true;
   }
 
@@ -42,10 +52,12 @@ function isWeatherCommand(text: string): boolean {
 
 function buildHelpMessage(): string {
   return [
-    "香港天文台天氣 Bot 指令：",
+    "香港天文台天氣 Bot：",
     "",
-    "/weather - 立即取得現在天氣",
-    "/now - 立即取得現在天氣",
-    "/help - 顯示此說明",
+    `按「${WEATHER_BUTTON_TEXT}」即可立即取得現在天氣。`,
+    "",
+    "也可輸入：",
+    "/weather 或 /now - 立即取得現在天氣",
+    "/help - 顯示此說明和鍵盤",
   ].join("\n");
 }

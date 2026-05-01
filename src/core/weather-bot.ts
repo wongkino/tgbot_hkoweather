@@ -15,7 +15,7 @@ export async function sendCurrentWeather(
   chatId: TelegramChatId,
 ): Promise<void> {
   const weather = await getCurrentWeather();
-  await sendTelegramMessage(telegram, buildDailyWeatherMessage(weather), chatId);
+  await sendTelegramMessage(telegram, buildDailyWeatherMessage(weather), { chatId });
 }
 
 export async function checkWarnings(

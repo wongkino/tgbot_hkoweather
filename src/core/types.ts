@@ -3,6 +3,22 @@ export interface TelegramConfig {
   chatId: string;
 }
 
+export interface TelegramKeyboardButton {
+  text: string;
+}
+
+export interface TelegramReplyKeyboardMarkup {
+  keyboard: TelegramKeyboardButton[][];
+  resize_keyboard?: boolean;
+  one_time_keyboard?: boolean;
+  is_persistent?: boolean;
+}
+
+export interface TelegramMessageOptions {
+  chatId?: TelegramChatId;
+  replyMarkup?: TelegramReplyKeyboardMarkup;
+}
+
 export interface StateStore {
   get(key: string): Promise<string | null>;
   put(key: string, value: string): Promise<void>;

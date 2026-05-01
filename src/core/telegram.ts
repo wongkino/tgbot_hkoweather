@@ -1,18 +1,23 @@
-import type { TelegramConfig, TelegramUpdate } from "./types";
+import type { TelegramConfig, TelegramMessageOptions, TelegramUpdate } from "./types";
 
 export async function sendTelegramMessage(
   config: TelegramConfig,
   text: string,
-  chatId: number | string = config.chatId,
+  options: TelegramMessageOptions = {},
 ): Promise<void> {
+  const body: Record<string, unknown> = {
+    chat_id: options.chatId ?? config.chatId,
+    text,
+    disable_web_page_preview: true,
+  };
+  if (options.replyMarkup) {
+    body.reply_markup = options.replyMarkup;
+  }
+
   const response = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      disable_web_page_preview: true,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
