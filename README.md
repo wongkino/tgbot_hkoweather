@@ -5,6 +5,7 @@
 - 每日香港時間 07:00 發送即時天氣報告
 - 定期輪詢香港天文台天氣警告
 - 有新警告、警告內容更新或警告取消時，即時傳送 Telegram 訊息
+- 支援 Telegram 指令手動查詢現在天氣
 
 ## 啟動方式
 
@@ -64,6 +65,24 @@ src/
 | `DAILY_REPORT_TIME` | `07:00` | Docker 長駐模式每日天氣報告時間，格式 `HH:MM`，香港時間 |
 | `WARNING_POLL_SECONDS` | `300` | Docker 長駐模式天氣警告輪詢秒數 |
 | `STATE_FILE` | `.hkoweather_bot_state.json` | Docker 長駐模式記錄上一個警告狀態 |
+
+## Telegram 指令
+
+| 指令 | 說明 |
+| --- | --- |
+| `/weather` | 立即推送現在天氣 |
+| `/now` | 立即推送現在天氣 |
+| `/help` | 顯示可用指令 |
+
+Docker / Bun 長駐模式會自動用 Telegram `getUpdates` 輪詢指令。
+
+你也可以在 BotFather 用 `/setcommands` 加入：
+
+```text
+weather - 立即取得現在天氣
+now - 立即取得現在天氣
+help - 顯示可用指令
+```
 
 ## Bun Docker / Docker Compose
 
@@ -198,6 +217,22 @@ workflow 會執行：
 3. 生成 CI 用 Wrangler config
 4. 部署 Worker
 5. 用 `wrangler secret put` 更新 Telegram secrets
+
+### 設定 Telegram webhook
+
+Cloudflare Workers 版要接收 `/weather` 指令，需要把 Telegram webhook 指向 Worker URL：
+
+```bash
+curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=https://<你的_worker_url>"
+```
+
+你也可以在 BotFather 用 `/setcommands` 加入：
+
+```text
+weather - 立即取得現在天氣
+now - 立即取得現在天氣
+help - 顯示可用指令
+```
 
 ### 本機 Worker 開發
 

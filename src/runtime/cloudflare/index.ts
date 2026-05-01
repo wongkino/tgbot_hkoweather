@@ -1,5 +1,6 @@
+import { handleTelegramUpdate } from "../../core/commands";
 import { checkWarnings, sendDailyWeather } from "../../core/weather-bot";
-import type { StateStore, TelegramConfig } from "../../core/types";
+import type { StateStore, TelegramConfig, TelegramUpdate } from "../../core/types";
 
 interface Env {
   TELEGRAM_BOT_TOKEN: string;
@@ -8,8 +9,16 @@ interface Env {
 }
 
 export default {
-  async fetch(): Promise<Response> {
-    return new Response("HKO Weather Telegram Bot is running.\n", {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    if (request.method === "POST") {
+      const update = (await request.json()) as TelegramUpdate;
+      ctx.waitUntil(handleTelegramUpdate(telegramConfig(env), update));
+      return new Response("OK\n", {
+        headers: { "content-type": "text/plain; charset=utf-8" },
+      });
+    }
+
+    return new Response("HKO Weather Telegram Bot is running. Configure Telegram webhook to this URL.\n", {
       headers: { "content-type": "text/plain; charset=utf-8" },
     });
   },
