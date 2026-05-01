@@ -1,0 +1,16 @@
+services:
+  hkoweather-bot:
+    image: oven/bun:1.3.13-slim
+    working_dir: /app
+    env_file: .env
+    command: sh -c "bun install --frozen-lockfile && bun run start:watch"
+    volumes:
+      - .:/app
+      - bun-dev-node-modules:/app/node_modules
+      - bot-dev-state:/app/state
+    environment:
+      STATE_FILE: /app/state/hkoweather-bot-state.json
+
+volumes:
+  bun-dev-node-modules:
+  bot-dev-state:
