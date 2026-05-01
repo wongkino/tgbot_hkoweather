@@ -176,13 +176,28 @@ id = "你的_kv_namespace_id"
 
 ```bash
 bunx wrangler secret put TELEGRAM_BOT_TOKEN
-```
-
-`TELEGRAM_CHAT_ID` 可直接放在 `wrangler.toml` 的 `[vars]`，或你也可以改用 secret：
-
-```bash
 bunx wrangler secret put TELEGRAM_CHAT_ID
 ```
+
+### GitHub Actions 自動部署
+
+push 到 `main` 時會自動部署到 Cloudflare Workers。你需要先在 GitHub repo 設定以下 secrets：
+
+| Secret | 說明 |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token，需要 Workers deploy 權限 |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account id |
+| `HKO_BOT_STATE_KV_NAMESPACE_ID` | `HKO_BOT_STATE` KV namespace id |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token，workflow 會寫入 Worker secret |
+| `TELEGRAM_CHAT_ID` | 接收訊息的 Telegram chat id，workflow 會寫入 Worker secret |
+
+workflow 會執行：
+
+1. `bun install --frozen-lockfile`
+2. `bun run typecheck`
+3. 生成 CI 用 Wrangler config
+4. 部署 Worker
+5. 用 `wrangler secret put` 更新 Telegram secrets
 
 ### 本機 Worker 開發
 
