@@ -212,7 +212,6 @@ push 到 `main` 時會自動部署到 Cloudflare Workers。你需要先在 GitHu
 | `HKO_BOT_STATE_KV_NAMESPACE_ID` | `HKO_BOT_STATE` KV namespace id |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token，workflow 會寫入 Worker secret |
 | `TELEGRAM_CHAT_ID` | 接收訊息的 Telegram chat id，workflow 會寫入 Worker secret |
-| `TELEGRAM_WEBHOOK_SETUP_SECRET` | 保護 `/telegram/set-webhook` 的 secret，workflow 會寫入 Worker secret |
 | `TELEGRAM_WEBHOOK_SECRET` | 選填；Telegram webhook secret token，設定後 Worker 會驗證 Telegram header |
 
 workflow 會執行：
@@ -220,18 +219,22 @@ workflow 會執行：
 1. `bun install --frozen-lockfile`
 2. `bun run typecheck`
 3. 生成 CI 用 Wrangler config
-4. 部署 Worker 並自動讀取部署後的 `workers.dev` URL
-5. 用 `wrangler secret put` 更新 Telegram secrets
-6. 重新部署一次，確保 Worker 使用最新 secrets
-7. 呼叫 Worker 內置 `/telegram/set-webhook` endpoint，由 Worker 自己設定 Telegram webhook
+4. 自動產生臨時 `TELEGRAM_WEBHOOK_SETUP_SECRET`
+5. 部署 Worker 並自動讀取部署後的 `workers.dev` URL
+6. 用 `wrangler secret put` 更新 Telegram secrets
+7. 重新部署一次，確保 Worker 使用最新 secrets
+8. 呼叫 Worker 內置 `/telegram/set-webhook` endpoint，由 Worker 自己設定 Telegram webhook
 
 ### 設定 Telegram webhook
 
 Cloudflare Workers 版要接收鍵盤訊息與指令，需要把 Telegram webhook 指向 Worker 的 `/telegram/webhook`。GitHub Actions 會自動呼叫 Worker 內置 endpoint 設定；本機也可以手動執行：
 
 ```bash
+SETUP_SECRET=$(openssl rand -hex 32)
+printf '%s' "$SETUP_SECRET" | bunx wrangler secret put TELEGRAM_WEBHOOK_SETUP_SECRET
+bun run worker:deploy
 curl -X POST https://<你的_worker_url>/telegram/set-webhook \
-  -H "Authorization: Bearer <TELEGRAM_WEBHOOK_SETUP_SECRET>"
+  -H "Authorization: Bearer $SETUP_SECRET"
 ```
 
 Worker 會將 Telegram webhook 設定為：

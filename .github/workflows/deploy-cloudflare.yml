@@ -20,7 +20,6 @@ jobs:
       HKO_BOT_STATE_KV_NAMESPACE_ID: ${{ secrets.HKO_BOT_STATE_KV_NAMESPACE_ID }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      TELEGRAM_WEBHOOK_SETUP_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SETUP_SECRET }}
       TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
 
     steps:
@@ -45,7 +44,13 @@ jobs:
           test -n "$HKO_BOT_STATE_KV_NAMESPACE_ID"
           test -n "$TELEGRAM_BOT_TOKEN"
           test -n "$TELEGRAM_CHAT_ID"
-          test -n "$TELEGRAM_WEBHOOK_SETUP_SECRET"
+
+      - name: Generate webhook setup secret
+        id: webhook-setup-secret
+        run: |
+          secret="$(openssl rand -hex 32)"
+          echo "::add-mask::$secret"
+          echo "value=$secret" >> "$GITHUB_OUTPUT"
 
       - name: Generate Wrangler CI config
         run: |
@@ -59,7 +64,7 @@ jobs:
         run: |
           printf '%s' "$TELEGRAM_BOT_TOKEN" | bunx wrangler secret put TELEGRAM_BOT_TOKEN --config wrangler.ci.toml
           printf '%s' "$TELEGRAM_CHAT_ID" | bunx wrangler secret put TELEGRAM_CHAT_ID --config wrangler.ci.toml
-          printf '%s' "$TELEGRAM_WEBHOOK_SETUP_SECRET" | bunx wrangler secret put TELEGRAM_WEBHOOK_SETUP_SECRET --config wrangler.ci.toml
+          printf '%s' "${{ steps.webhook-setup-secret.outputs.value }}" | bunx wrangler secret put TELEGRAM_WEBHOOK_SETUP_SECRET --config wrangler.ci.toml
           if [ -n "$TELEGRAM_WEBHOOK_SECRET" ]; then
             printf '%s' "$TELEGRAM_WEBHOOK_SECRET" | bunx wrangler secret put TELEGRAM_WEBHOOK_SECRET --config wrangler.ci.toml
           fi
@@ -79,7 +84,7 @@ jobs:
         run: |
           curl --fail-with-body \
             --request POST \
-            --header "authorization: Bearer ${TELEGRAM_WEBHOOK_SETUP_SECRET}" \
+            --header "authorization: Bearer ${{ steps.webhook-setup-secret.outputs.value }}" \
             --header "content-type: application/json" \
             --data "{}" \
             "${{ steps.deploy.outputs.worker_url }}/telegram/set-webhook"
