@@ -212,6 +212,8 @@ push 到 `main` 時會自動部署到 Cloudflare Workers。你需要先在 GitHu
 | `HKO_BOT_STATE_KV_NAMESPACE_ID` | `HKO_BOT_STATE` KV namespace id |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token，workflow 會寫入 Worker secret |
 | `TELEGRAM_CHAT_ID` | 接收訊息的 Telegram chat id，workflow 會寫入 Worker secret |
+| `TELEGRAM_WEBHOOK_URL` | 部署後的 Worker URL，例如 `https://hko-weather-telegram-bot.<subdomain>.workers.dev` |
+| `TELEGRAM_WEBHOOK_SECRET` | 選填；Telegram webhook secret token，設定後 Worker 會驗證 Telegram header |
 
 workflow 會執行：
 
@@ -220,13 +222,25 @@ workflow 會執行：
 3. 生成 CI 用 Wrangler config
 4. 部署 Worker
 5. 用 `wrangler secret put` 更新 Telegram secrets
+6. 自動呼叫 Telegram `setWebhook`
 
 ### 設定 Telegram webhook
 
-Cloudflare Workers 版要接收鍵盤訊息與指令，需要把 Telegram webhook 指向 Worker URL：
+Cloudflare Workers 版要接收鍵盤訊息與指令，需要把 Telegram webhook 指向 Worker URL。GitHub Actions 會自動設定；本機也可以手動執行：
 
 ```bash
-curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=https://<你的_worker_url>"
+TELEGRAM_BOT_TOKEN=<你的_bot_token> \
+TELEGRAM_WEBHOOK_URL=https://<你的_worker_url> \
+bun run telegram:set-webhook
+```
+
+如有設定 webhook secret：
+
+```bash
+TELEGRAM_BOT_TOKEN=<你的_bot_token> \
+TELEGRAM_WEBHOOK_URL=https://<你的_worker_url> \
+TELEGRAM_WEBHOOK_SECRET=<你的_secret_token> \
+bun run telegram:set-webhook
 ```
 
 ### 本機 Worker 開發
