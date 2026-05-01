@@ -17,7 +17,7 @@ jobs:
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      HKO_BOT_STATE_KV_NAMESPACE_ID: ${{ secrets.HKO_BOT_STATE_KV_NAMESPACE_ID }}
+      HKO_BOT_STATE_KV_NAMESPACE_NAME: tgbot_hkoweather
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
@@ -41,9 +41,34 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test -n "$CLOUDFLARE_API_TOKEN"
-          test -n "$HKO_BOT_STATE_KV_NAMESPACE_ID"
           test -n "$TELEGRAM_BOT_TOKEN"
           test -n "$TELEGRAM_CHAT_ID"
+
+      - name: Ensure KV namespace
+        id: kv-namespace
+        run: |
+          get_namespace_id() {
+            bun -e '
+              const fs = require("node:fs");
+              const namespaceName = process.argv[1];
+              const namespaces = JSON.parse(fs.readFileSync(0, "utf8"));
+              const namespace = namespaces.find((item) => item.title === namespaceName);
+              process.stdout.write(namespace?.id ?? "");
+            ' "$HKO_BOT_STATE_KV_NAMESPACE_NAME"
+          }
+
+          kv_id="$(bunx wrangler kv namespace list | get_namespace_id)"
+          if [ -z "$kv_id" ]; then
+            bunx wrangler kv namespace create "$HKO_BOT_STATE_KV_NAMESPACE_NAME" --binding HKO_BOT_STATE
+            kv_id="$(bunx wrangler kv namespace list | get_namespace_id)"
+          fi
+
+          if [ -z "$kv_id" ]; then
+            echo "Unable to determine KV namespace id for ${HKO_BOT_STATE_KV_NAMESPACE_NAME}." >&2
+            exit 1
+          fi
+
+          echo "id=$kv_id" >> "$GITHUB_OUTPUT"
 
       - name: Generate webhook setup secret
         id: webhook-setup-secret
@@ -54,7 +79,7 @@ jobs:
 
       - name: Generate Wrangler CI config
         run: |
-          sed "s/replace_with_your_kv_namespace_id/${HKO_BOT_STATE_KV_NAMESPACE_ID}/" wrangler.toml > wrangler.ci.toml
+          sed "s/replace_with_your_kv_namespace_id/${{ steps.kv-namespace.outputs.id }}/" wrangler.toml > wrangler.ci.toml
 
       - name: Deploy Worker
         run: |

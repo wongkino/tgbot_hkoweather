@@ -180,18 +180,18 @@ Cloudflare Worker 不會長駐，而是靠 Cron Triggers 執行：
 - `0 23 * * *`：UTC 23:00，即香港時間每日 07:00，發送每日天氣報告
 - `*/5 * * * *`：每 5 分鐘檢查一次天氣警告
 
-### 建立 KV namespace
+### KV namespace
 
-```bash
-bunx wrangler kv namespace create HKO_BOT_STATE
+GitHub Actions 會自動查找或建立 KV namespace：
+
+```text
+tgbot_hkoweather
 ```
 
-把輸出的 `id` 填入 `wrangler.toml`：
+Worker 內的 binding 名稱固定為：
 
-```toml
-[[kv_namespaces]]
-binding = "HKO_BOT_STATE"
-id = "你的_kv_namespace_id"
+```text
+HKO_BOT_STATE
 ```
 
 ### 設定 Telegram secret
@@ -209,7 +209,6 @@ push 到 `main` 時會自動部署到 Cloudflare Workers。你需要先在 GitHu
 | --- | --- |
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API token，需要 Workers deploy 權限 |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account id |
-| `HKO_BOT_STATE_KV_NAMESPACE_ID` | `HKO_BOT_STATE` KV namespace id |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token，workflow 會寫入 Worker secret |
 | `TELEGRAM_CHAT_ID` | 接收訊息的 Telegram chat id，workflow 會寫入 Worker secret |
 | `TELEGRAM_WEBHOOK_SECRET` | 選填；Telegram webhook secret token，設定後 Worker 會驗證 Telegram header |
@@ -218,12 +217,13 @@ workflow 會執行：
 
 1. `bun install --frozen-lockfile`
 2. `bun run typecheck`
-3. 生成 CI 用 Wrangler config
-4. 自動產生臨時 `TELEGRAM_WEBHOOK_SETUP_SECRET`
-5. 部署 Worker 並自動讀取部署後的 `workers.dev` URL
-6. 用 `wrangler secret put` 更新 Telegram secrets
-7. 重新部署一次，確保 Worker 使用最新 secrets
-8. 呼叫 Worker 內置 `/telegram/set-webhook` endpoint，由 Worker 自己設定 Telegram webhook
+3. 自動查找或建立 `tgbot_hkoweather` KV namespace
+4. 生成 CI 用 Wrangler config
+5. 自動產生臨時 `TELEGRAM_WEBHOOK_SETUP_SECRET`
+6. 部署 Worker 並自動讀取部署後的 `workers.dev` URL
+7. 用 `wrangler secret put` 更新 Telegram secrets
+8. 重新部署一次，確保 Worker 使用最新 secrets
+9. 呼叫 Worker 內置 `/telegram/set-webhook` endpoint，由 Worker 自己設定 Telegram webhook
 
 ### 設定 Telegram webhook
 
