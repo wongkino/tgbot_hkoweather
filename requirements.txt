@@ -1,4 +1,0 @@
-apscheduler
-python-dotenv
-pytest
-requests
