@@ -1,8 +1,13 @@
 import type {
   CurrentWeather,
+  DailyDetailedContext,
   DailyWeatherContext,
   DayForecast,
+  DetailedCurrentWeather,
   LocalForecast,
+  NineDayForecastOverview,
+  SpecialWeatherTips,
+  StationReading,
   WarningSnapshot,
 } from "./types";
 
@@ -88,11 +93,150 @@ export async function getLocalForecast(): Promise<LocalForecast> {
   return {
     generalSituation: String(data.generalSituation || "").trim(),
     tcInfo: String(data.tcInfo || "").trim(),
+    fireDangerWarning: String(data.fireDangerWarning || "").trim(),
     forecastPeriod: String(data.forecastPeriod || "").trim(),
     forecastDesc: String(data.forecastDesc || "").trim(),
     outlook: String(data.outlook || "").trim(),
     updateTime: formatUpdateTime(data.updateTime),
   };
+}
+
+export async function getDetailedCurrentWeather(): Promise<DetailedCurrentWeather> {
+  const data = await hkoJson<Record<string, unknown>>("rhrread");
+  const rainfall = asRecord(data.rainfall);
+
+  return {
+    updateTime: formatUpdateTime(data.updateTime),
+    temperatures: formatStationReadings(data.temperature),
+    humidity: formatStationReadings(data.humidity),
+    uvIndex: formatUvIndex(data.uvindex),
+    rainfallByDistrict: formatRainfallByDistrict(rainfall),
+    rainfallPeriod: formatRainfallPeriod(rainfall),
+    warningMessage: formatWeatherWarningMessage(data.warningMessage),
+    tropicalCycloneMessage: formatTextList(data.tcmessage),
+    weatherIconUpdateTime: formatUpdateTime(data.iconUpdateTime),
+  };
+}
+
+export async function getSpecialWeatherTips(): Promise<SpecialWeatherTips> {
+  const data = await hkoJson<Record<string, unknown>>("swt");
+  const entries = Array.isArray(data.swt) ? data.swt : [];
+  const tips: string[] = [];
+
+  for (const raw of entries) {
+    const item = asRecord(raw);
+    const desc = String(item?.desc || "").trim();
+    if (desc) {
+      tips.push(desc);
+    }
+  }
+
+  const first = asRecord(entries[0]);
+  return {
+    tips,
+    updateTime: formatUpdateTime(first?.updateTime),
+  };
+}
+
+export async function getNineDayForecastOverview(): Promise<NineDayForecastOverview> {
+  const data = await hkoJson<Record<string, unknown>>("fnd");
+  const forecasts = Array.isArray(data.weatherForecast) ? data.weatherForecast : [];
+  const today = todayInHongKong();
+  const dayForecasts = forecasts
+    .map((raw) => asRecord(raw))
+    .filter((item): item is Record<string, unknown> => item !== undefined)
+    .map((item) => formatDayForecast(item));
+
+  const todayForecast = dayForecasts.find((item) => item.date === today) ?? dayForecasts[0] ?? null;
+  const upcomingDays = dayForecasts.filter((item) => item.date !== todayForecast?.date).slice(0, 3);
+
+  return {
+    generalSituation: String(data.generalSituation || "").trim(),
+    seaTemperature: formatSeaTemperature(data.seaTemp),
+    soilTemperature: formatSoilTemperature(data.soilTemp),
+    updateTime: formatUpdateTime(data.updateTime),
+    today: todayForecast,
+    upcomingDays,
+  };
+}
+
+export async function getDetailedDailyWeatherContext(): Promise<DailyDetailedContext> {
+  const [current, localForecast, nineDay, specialTips, warnings] = await Promise.all([
+    getDetailedCurrentWeather(),
+    getLocalForecast(),
+    getNineDayForecastOverview(),
+    getSpecialWeatherTips(),
+    getWarningSnapshot(),
+  ]);
+
+  return {
+    current,
+    localForecast,
+    nineDay,
+    specialTips,
+    warnings,
+  };
+}
+
+export function buildDetailedDailyBriefing(context: DailyDetailedContext): string {
+  const lines: string[] = ["以下為香港天文台詳盡天氣資料：", ""];
+  const { current, localForecast, nineDay, specialTips, warnings } = context;
+
+  lines.push(
+    "【現時天氣報告】",
+    `更新時間：${current.updateTime}`,
+    `各區氣溫：${formatStationList(current.temperatures)}`,
+    `相對濕度：${formatStationList(current.humidity)}`,
+    `紫外線指數：${current.uvIndex}`,
+    `過去一小時雨量（${current.rainfallPeriod}）：${formatStationList(current.rainfallByDistrict)}`,
+    `天氣圖示更新時間：${current.weatherIconUpdateTime}`,
+    `特別天氣提示：${current.warningMessage}`,
+  );
+
+  if (current.tropicalCycloneMessage) {
+    lines.push(`熱帶氣旋相關消息：${current.tropicalCycloneMessage}`);
+  }
+
+  lines.push(
+    "",
+    "【本港地區天氣預測】",
+    `更新時間：${localForecast.updateTime}`,
+    `天氣概況：${localForecast.generalSituation || "無"}`,
+    `熱帶氣旋資訊：${localForecast.tcInfo || "無"}`,
+    `火災危險警告：${localForecast.fireDangerWarning || "無"}`,
+    `${localForecast.forecastPeriod || "預測"}：${localForecast.forecastDesc || "無"}`,
+    `展望：${localForecast.outlook || "無"}`,
+  );
+
+  lines.push(
+    "",
+    "【九天天氣預報概況】",
+    `更新時間：${nineDay.updateTime}`,
+    `天氣概況：${nineDay.generalSituation || "無"}`,
+    `海水溫度：${nineDay.seaTemperature}`,
+    `土壤溫度：${nineDay.soilTemperature}`,
+  );
+
+  if (nineDay.today) {
+    lines.push("", formatDayForecastBlock("今日預報", nineDay.today));
+  }
+
+  for (const day of nineDay.upcomingDays) {
+    lines.push("", formatDayForecastBlock("短期預報", day));
+  }
+
+  if (specialTips.tips.length > 0) {
+    lines.push("", "【特別天氣消息】", `更新時間：${specialTips.updateTime}`);
+    for (const tip of specialTips.tips) {
+      lines.push(`- ${tip}`);
+    }
+  }
+
+  if (warnings.hasNotification && warnings.message) {
+    lines.push("", "【生效天氣警告】", warnings.message);
+  }
+
+  return lines.join("\n");
 }
 
 export async function getTodayDayForecast(): Promise<DayForecast | null> {
@@ -127,6 +271,120 @@ export async function getDailyWeatherContext(): Promise<DailyWeatherContext> {
     todayForecast,
     warnings,
   };
+}
+
+function formatStationReadings(raw: unknown, valueSuffix = ""): StationReading[] {
+  const container = asRecord(raw);
+  const records = Array.isArray(container?.data) ? container.data : [];
+  const unit = String(container?.unit || "");
+
+  return records
+    .map((record) => {
+      const item = asRecord(record);
+      if (!item || item.value === undefined || item.value === null) {
+        return null;
+      }
+
+      const place = String(item.place || "未知地區");
+      let valueText = String(item.value);
+      if (unit === "C") {
+        valueText = `${valueText}°C`;
+      } else if (unit === "percent") {
+        valueText = `${valueText}%`;
+      } else if (unit) {
+        valueText = `${valueText}${unit}`;
+      } else if (valueSuffix) {
+        valueText = `${valueText}${valueSuffix}`;
+      }
+
+      return { place, value: valueText };
+    })
+    .filter((item): item is StationReading => item !== null);
+}
+
+function formatStationList(readings: StationReading[]): string {
+  if (readings.length === 0) {
+    return "未能取得";
+  }
+
+  return readings.map((reading) => `${reading.place} ${reading.value}`).join("；");
+}
+
+function formatRainfallByDistrict(container: Record<string, unknown> | undefined): StationReading[] {
+  const records = Array.isArray(container?.data) ? container.data.filter(isRecord) : [];
+  const unit = String(container?.unit || "mm");
+
+  return records.map((record) => ({
+    place: String(record.place || "未知地區"),
+    value: `${String(record.max ?? 0)}${unit}`,
+  }));
+}
+
+function formatRainfallPeriod(container: Record<string, unknown> | undefined): string {
+  const start = container?.startTime ? formatDateTime(String(container.startTime)) : "";
+  const end = container?.endTime ? formatDateTime(String(container.endTime)) : "";
+  if (start && end) {
+    return `${start} 至 ${end}`;
+  }
+  return "未知";
+}
+
+function formatSeaTemperature(raw: unknown): string {
+  const record = asRecord(raw);
+  if (!record || record.value === undefined || record.value === null) {
+    return "未能取得";
+  }
+
+  const place = String(record.place || "未知地點");
+  const unit = String(record.unit || "C");
+  const time = record.recordTime ? formatDateTime(String(record.recordTime)) : "";
+  const value = `${place} ${String(record.value)}°${unit}`;
+  return time ? `${value}（${time}）` : value;
+}
+
+function formatSoilTemperature(raw: unknown): string {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return "未能取得";
+  }
+
+  return raw
+    .map((item) => {
+      const record = asRecord(item);
+      if (!record || record.value === undefined || record.value === null) {
+        return null;
+      }
+
+      const place = String(record.place || "未知地點");
+      const depth = asRecord(record.depth);
+      const depthValue = depth?.value !== undefined ? `${String(depth.value)}${String(depth.unit || "m")}` : "";
+      const unit = String(record.unit || "C");
+      const depthLabel = depthValue ? ` 深度${depthValue}` : "";
+      return `${place}${depthLabel} ${String(record.value)}°${unit}`;
+    })
+    .filter(Boolean)
+    .join("；");
+}
+
+function formatTextList(raw: unknown): string {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return "";
+  }
+
+  return raw
+    .map((item) => String(item).trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+function formatDayForecastBlock(label: string, day: DayForecast): string {
+  return [
+    `【${label}：${day.date}（${day.week}）】`,
+    `天氣：${day.weather}`,
+    `氣溫：${day.minTemp} - ${day.maxTemp}`,
+    `相對濕度：${day.minRh} - ${day.maxRh}`,
+    `風向風速：${day.wind}`,
+    `降雨概率：${day.rainProbability || "無"}`,
+  ].join("\n");
 }
 
 function formatDayForecast(item: Record<string, unknown>): DayForecast {

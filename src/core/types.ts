@@ -68,10 +68,50 @@ export interface WarningSnapshot {
 export interface LocalForecast {
   generalSituation: string;
   tcInfo: string;
+  fireDangerWarning: string;
   forecastPeriod: string;
   forecastDesc: string;
   outlook: string;
   updateTime: string;
+}
+
+export interface StationReading {
+  place: string;
+  value: string;
+}
+
+export interface DetailedCurrentWeather {
+  updateTime: string;
+  temperatures: StationReading[];
+  humidity: StationReading[];
+  uvIndex: string;
+  rainfallByDistrict: StationReading[];
+  rainfallPeriod: string;
+  warningMessage: string;
+  tropicalCycloneMessage: string;
+  weatherIconUpdateTime: string;
+}
+
+export interface NineDayForecastOverview {
+  generalSituation: string;
+  seaTemperature: string;
+  soilTemperature: string;
+  updateTime: string;
+  today: DayForecast | null;
+  upcomingDays: DayForecast[];
+}
+
+export interface SpecialWeatherTips {
+  tips: string[];
+  updateTime: string;
+}
+
+export interface DailyDetailedContext {
+  current: DetailedCurrentWeather;
+  localForecast: LocalForecast;
+  nineDay: NineDayForecastOverview;
+  specialTips: SpecialWeatherTips;
+  warnings: WarningSnapshot;
 }
 
 export interface DayForecast {

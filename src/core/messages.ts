@@ -16,6 +16,18 @@ export function buildDailyWeatherMessage(weather: CurrentWeather): string {
   ].join("\n");
 }
 
+export function buildAiDailyWeatherMessage(updateTime: string, analysis: string): string {
+  return [
+    "香港今日天氣報告",
+    `更新時間：${updateTime}`,
+    "",
+    analysis.trim(),
+    "",
+    "—",
+    "資料來源：香港天文台 · 分析由 OpenRouter 免費模型生成",
+  ].join("\n");
+}
+
 export function buildAiWeatherMessage(
   context: DailyWeatherContext,
   analysis: string,

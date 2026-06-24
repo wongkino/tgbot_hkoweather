@@ -4,10 +4,29 @@ const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 export type WeatherAnalysisMode = "daily" | "current";
 
+export async function analyzeDailyWeatherWithOpenRouter(
+  config: OpenRouterConfig,
+  briefing: string,
+): Promise<string> {
+  return requestOpenRouterAnalysis(config, buildDailySystemPrompt(), briefing);
+}
+
 export async function analyzeWeatherWithOpenRouter(
   config: OpenRouterConfig,
   context: DailyWeatherContext,
   mode: WeatherAnalysisMode,
+): Promise<string> {
+  if (mode === "daily") {
+    throw new Error("Use analyzeDailyWeatherWithOpenRouter for daily mode.");
+  }
+
+  return requestOpenRouterAnalysis(config, buildCurrentSystemPrompt(), buildCurrentUserPrompt(context));
+}
+
+async function requestOpenRouterAnalysis(
+  config: OpenRouterConfig,
+  systemPrompt: string,
+  userPrompt: string,
 ): Promise<string> {
   const response = await fetch(OPENROUTER_API_URL, {
     method: "POST",
@@ -20,11 +39,11 @@ export async function analyzeWeatherWithOpenRouter(
     body: JSON.stringify({
       model: config.model,
       messages: [
-        { role: "system", content: buildSystemPrompt(mode) },
-        { role: "user", content: buildUserPrompt(context, mode) },
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
       ],
       temperature: 0.4,
-      max_tokens: 600,
+      max_tokens: 700,
     }),
   });
 
@@ -50,18 +69,24 @@ export async function analyzeWeatherWithOpenRouter(
   return content;
 }
 
-function buildSystemPrompt(mode: WeatherAnalysisMode): string {
-  if (mode === "daily") {
-    return [
-      "你是香港天氣助理，根據香港天文台提供的資料撰寫當日天氣報告。",
-      "請使用繁體中文，語氣清晰友善。",
-      "內容須包含：今日天氣概況、氣溫與濕度重點、紫外線或雨量提示、生效中的天氣警告、外出建議（例如帶傘、防曬、穿衣）。",
-      "只可根據提供的資料分析，不可捏造未提供的數據。",
-      "全文控制在 500 字以內，適合在 Telegram 閱讀。",
-      "不要使用 Markdown 標題符號（#），可用簡短分段。",
-    ].join("\n");
-  }
+function buildDailySystemPrompt(): string {
+  return [
+    "你是香港天氣助理。根據香港天文台提供的詳盡資料，只輸出以下兩個部分，不要加入其他標題或前言：",
+    "",
+    "【天氣狀況】",
+    "（在此撰寫今日整體天氣狀況）",
+    "",
+    "【外出建議】",
+    "（在此撰寫外出建議）",
+    "",
+    "【天氣狀況】須綜合說明：整體天氣、各區氣溫與濕度重點、紫外線、雨量、熱帶氣旋、特別天氣消息、生效警告、今日及短期預報。",
+    "【外出建議】須具體實用，例如：是否帶雨傘、防曬、補充水分、穿衣、戶外活動、長者與兒童注意事項。",
+    "只可根據提供的資料分析，不可捏造未提供的數據。",
+    "請使用繁體中文，語氣清晰友善，全文不超過 500 字。",
+  ].join("\n");
+}
 
+function buildCurrentSystemPrompt(): string {
   return [
     "你是香港天氣助理，根據香港天文台提供的資料撰寫現時天氣摘要。",
     "請使用繁體中文，語氣清晰友善。",
@@ -72,9 +97,9 @@ function buildSystemPrompt(mode: WeatherAnalysisMode): string {
   ].join("\n");
 }
 
-function buildUserPrompt(context: DailyWeatherContext, mode: WeatherAnalysisMode): string {
+function buildCurrentUserPrompt(context: DailyWeatherContext): string {
   const lines = [
-    mode === "daily" ? "請根據以下香港天文台資料，撰寫今日天氣報告：" : "請根據以下香港天文台資料，撰寫現時天氣摘要：",
+    "請根據以下香港天文台資料，撰寫現時天氣摘要：",
     "",
     "【現時天氣】",
     `更新時間：${context.current.updateTime}`,
