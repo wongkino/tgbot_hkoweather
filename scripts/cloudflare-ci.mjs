@@ -15,22 +15,69 @@ function requiredEnv(name) {
 }
 
 function wrangler(args) {
-  return execFileSync("bunx", ["wrangler", ...args], {
-    encoding: "utf8",
-    env: process.env,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  try {
+    return execFileSync("bunx", ["wrangler", ...args], {
+      encoding: "utf8",
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (error) {
+    const stderr = error.stderr?.toString?.() ?? "";
+    const stdout = error.stdout?.toString?.() ?? "";
+    if (stderr) {
+      console.error(stderr);
+    }
+    if (stdout) {
+      console.error(stdout);
+    }
+    throw error;
+  }
+}
+
+function parseWranglerJson(output) {
+  const trimmed = output.trim();
+  if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+    return JSON.parse(trimmed);
+  }
+
+  const start = output.indexOf("[");
+  const end = output.lastIndexOf("]");
+  if (start !== -1 && end > start) {
+    return JSON.parse(output.slice(start, end + 1));
+  }
+
+  throw new Error(`Unable to parse Wrangler JSON output: ${output.slice(0, 300)}`);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withRetries(label, task, attempts = 3, delayMs = 5000) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await task();
+    } catch (error) {
+      lastError = error;
+      console.error(`${label} failed (attempt ${attempt}/${attempts}):`, error);
+      if (attempt < attempts) {
+        await sleep(delayMs);
+      }
+    }
+  }
+  throw lastError;
 }
 
 function ensureKvNamespaceId() {
-  const namespaces = JSON.parse(wrangler(["kv", "namespace", "list"]));
+  const namespaces = parseWranglerJson(wrangler(["kv", "namespace", "list"]));
   const existing = namespaces.find((item) => item.title === KV_NAMESPACE_NAME);
   if (existing?.id) {
     return existing.id;
   }
 
   wrangler(["kv", "namespace", "create", KV_NAMESPACE_NAME, "--binding", "HKO_BOT_STATE"]);
-  const refreshed = JSON.parse(wrangler(["kv", "namespace", "list"]));
+  const refreshed = parseWranglerJson(wrangler(["kv", "namespace", "list"]));
   const created = refreshed.find((item) => item.title === KV_NAMESPACE_NAME);
   if (!created?.id) {
     throw new Error(`Unable to determine KV namespace id for ${KV_NAMESPACE_NAME}.`);
@@ -114,15 +161,18 @@ async function setTelegramWebhook(workerUrl, webhookSetupSecret) {
 const command = process.argv[2] ?? "deploy";
 
 if (command === "deploy") {
-  const kvId = ensureKvNamespaceId();
+  const kvId = await withRetries("Ensure KV namespace", async () => ensureKvNamespaceId());
   writeWranglerCiConfig(kvId);
 
   const webhookSetupSecret = randomBytes(32).toString("hex");
   writeSecretsFile(webhookSetupSecret);
-  deployWorker();
 
-  const workerUrl = await resolveWorkerUrl();
-  await setTelegramWebhook(workerUrl, webhookSetupSecret);
+  await withRetries("Deploy Worker", async () => {
+    deployWorker();
+  });
+
+  const workerUrl = await withRetries("Resolve Worker URL", async () => resolveWorkerUrl());
+  await withRetries("Set Telegram webhook", async () => setTelegramWebhook(workerUrl, webhookSetupSecret));
 
   console.log(`Deployed ${WORKER_NAME} to ${workerUrl}`);
 } else {
