@@ -1,17 +1,17 @@
 import type { OpenRouterConfig } from "./types";
 import {
+  buildDetailedCurrentBriefing,
   buildDetailedDailyBriefing,
-  getDailyWeatherContext,
   getDetailedDailyWeatherContext,
 } from "./hko";
 import {
+  analyzeCurrentWeatherWithOpenRouter,
   analyzeDailyWeatherWithOpenRouter,
-  analyzeWeatherWithOpenRouter,
   type WeatherAnalysisMode,
 } from "./openrouter";
 import {
+  buildAiCurrentWeatherMessage,
   buildAiDailyWeatherMessage,
-  buildAiWeatherMessage,
   buildDailyWeatherMessage,
 } from "./messages";
 
@@ -19,49 +19,38 @@ export async function buildWeatherReportMessage(
   openRouter: OpenRouterConfig | undefined,
   mode: WeatherAnalysisMode,
 ): Promise<string> {
+  const context = await getDetailedDailyWeatherContext();
+  const fallbackMessage = buildDailyWeatherMessage({
+    temperature: formatSummaryTemperature(context.current.temperatures),
+    humidity: formatSummaryHumidity(context.current.humidity),
+    uvIndex: context.current.uvIndex,
+    rainfall: formatSummaryRainfall(context.current.rainfallByDistrict),
+    updateTime: context.current.updateTime,
+    warningMessage: context.current.warningMessage,
+  });
+
+  if (!openRouter) {
+    return fallbackMessage;
+  }
+
   if (mode === "daily") {
-    const context = await getDetailedDailyWeatherContext();
-
-    if (!openRouter) {
-      return buildDailyWeatherMessage({
-        temperature: formatSummaryTemperature(context.current.temperatures),
-        humidity: formatSummaryHumidity(context.current.humidity),
-        uvIndex: context.current.uvIndex,
-        rainfall: formatSummaryRainfall(context.current.rainfallByDistrict),
-        updateTime: context.current.updateTime,
-        warningMessage: context.current.warningMessage,
-      });
-    }
-
     try {
       const briefing = buildDetailedDailyBriefing(context);
       const analysis = await analyzeDailyWeatherWithOpenRouter(openRouter, briefing);
       return buildAiDailyWeatherMessage(context.current.updateTime, analysis);
     } catch (error) {
       console.error("OpenRouter daily weather analysis failed, falling back to raw report", error);
-      return buildDailyWeatherMessage({
-        temperature: formatSummaryTemperature(context.current.temperatures),
-        humidity: formatSummaryHumidity(context.current.humidity),
-        uvIndex: context.current.uvIndex,
-        rainfall: formatSummaryRainfall(context.current.rainfallByDistrict),
-        updateTime: context.current.updateTime,
-        warningMessage: context.current.warningMessage,
-      });
+      return fallbackMessage;
     }
   }
 
-  const context = await getDailyWeatherContext();
-
-  if (!openRouter) {
-    return buildDailyWeatherMessage(context.current);
-  }
-
   try {
-    const analysis = await analyzeWeatherWithOpenRouter(openRouter, context, mode);
-    return buildAiWeatherMessage(context, analysis, mode);
+    const briefing = buildDetailedCurrentBriefing(context);
+    const analysis = await analyzeCurrentWeatherWithOpenRouter(openRouter, briefing);
+    return buildAiCurrentWeatherMessage(context.current.updateTime, analysis);
   } catch (error) {
-    console.error("OpenRouter weather analysis failed, falling back to raw report", error);
-    return buildDailyWeatherMessage(context.current);
+    console.error("OpenRouter current weather analysis failed, falling back to raw report", error);
+    return fallbackMessage;
   }
 }
 

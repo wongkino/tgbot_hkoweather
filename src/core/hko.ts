@@ -239,6 +239,54 @@ export function buildDetailedDailyBriefing(context: DailyDetailedContext): strin
   return lines.join("\n");
 }
 
+export function buildDetailedCurrentBriefing(context: DailyDetailedContext): string {
+  const lines: string[] = ["以下為香港天文台現時及相關天氣資料：", ""];
+  const { current, localForecast, nineDay, specialTips, warnings } = context;
+
+  lines.push(
+    "【現時天氣報告】",
+    `更新時間：${current.updateTime}`,
+    `各區氣溫：${formatStationList(current.temperatures)}`,
+    `相對濕度：${formatStationList(current.humidity)}`,
+    `紫外線指數：${current.uvIndex}`,
+    `過去一小時雨量（${current.rainfallPeriod}）：${formatStationList(current.rainfallByDistrict)}`,
+    `天氣圖示更新時間：${current.weatherIconUpdateTime}`,
+    `特別天氣提示：${current.warningMessage}`,
+  );
+
+  if (current.tropicalCycloneMessage) {
+    lines.push(`熱帶氣旋相關消息：${current.tropicalCycloneMessage}`);
+  }
+
+  lines.push(
+    "",
+    "【本港地區天氣預測】",
+    `更新時間：${localForecast.updateTime}`,
+    `天氣概況：${localForecast.generalSituation || "無"}`,
+    `熱帶氣旋資訊：${localForecast.tcInfo || "無"}`,
+    `火災危險警告：${localForecast.fireDangerWarning || "無"}`,
+    `${localForecast.forecastPeriod || "預測"}：${localForecast.forecastDesc || "無"}`,
+    `展望：${localForecast.outlook || "無"}`,
+  );
+
+  if (nineDay.today) {
+    lines.push("", formatDayForecastBlock("今日餘下時間參考", nineDay.today));
+  }
+
+  if (specialTips.tips.length > 0) {
+    lines.push("", "【特別天氣消息】", `更新時間：${specialTips.updateTime}`);
+    for (const tip of specialTips.tips) {
+      lines.push(`- ${tip}`);
+    }
+  }
+
+  if (warnings.hasNotification && warnings.message) {
+    lines.push("", "【生效天氣警告】", warnings.message);
+  }
+
+  return lines.join("\n");
+}
+
 export async function getTodayDayForecast(): Promise<DayForecast | null> {
   const data = await hkoJson<Record<string, unknown>>("fnd");
   const forecasts = Array.isArray(data.weatherForecast) ? data.weatherForecast : [];
