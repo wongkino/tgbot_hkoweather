@@ -1,8 +1,11 @@
+import type { OpenRouterConfig } from "../../core/types";
+
 export interface DockerConfig {
   telegram: {
     botToken: string;
     chatId: string;
   };
+  openRouter?: OpenRouterConfig;
   dailyReportTime: string;
   warningPollSeconds: number;
   stateFile: string;
@@ -22,9 +25,22 @@ export function loadDockerConfig(): DockerConfig {
       botToken: telegramBotToken,
       chatId: telegramChatId,
     },
+    openRouter: loadOptionalOpenRouterConfig(),
     dailyReportTime: process.env.DAILY_REPORT_TIME || "07:00",
     warningPollSeconds,
     stateFile: process.env.STATE_FILE || ".hkoweather_bot_state.json",
+  };
+}
+
+function loadOptionalOpenRouterConfig(): OpenRouterConfig | undefined {
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+  if (!apiKey) {
+    return undefined;
+  }
+
+  return {
+    apiKey,
+    model: process.env.OPENROUTER_MODEL?.trim() || "openrouter/free",
   };
 }
 

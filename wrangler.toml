@@ -1,6 +1,10 @@
 name = "hko-weather-telegram-bot"
 main = "src/runtime/cloudflare/index.ts"
 compatibility_date = "2026-04-30"
+workers_dev = true
+
+[vars]
+OPENROUTER_MODEL = "openrouter/free"
 
 [[kv_namespaces]]
 binding = "HKO_BOT_STATE"

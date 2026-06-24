@@ -1,21 +1,26 @@
-import { getCurrentWeather, getWarningSnapshot } from "./hko";
-import { buildDailyWeatherMessage, buildWarningMessage } from "./messages";
+import { buildWeatherReportMessage } from "./weather-context";
+import { getWarningSnapshot } from "./hko";
+import { buildWarningMessage } from "./messages";
 import { sendTelegramMessage } from "./telegram";
-import type { StateStore, TelegramConfig, TelegramChatId } from "./types";
+import type { OpenRouterConfig, StateStore, TelegramConfig, TelegramChatId } from "./types";
 
 export const LAST_WARNING_SIGNATURE_KEY = "last_warning_signature";
 
-export async function sendDailyWeather(telegram: TelegramConfig): Promise<void> {
-  const weather = await getCurrentWeather();
-  await sendTelegramMessage(telegram, buildDailyWeatherMessage(weather));
+export async function sendDailyWeather(
+  telegram: TelegramConfig,
+  openRouter?: OpenRouterConfig,
+): Promise<void> {
+  const message = await buildWeatherReportMessage(openRouter, "daily");
+  await sendTelegramMessage(telegram, message);
 }
 
 export async function sendCurrentWeather(
   telegram: TelegramConfig,
   chatId: TelegramChatId,
+  openRouter?: OpenRouterConfig,
 ): Promise<void> {
-  const weather = await getCurrentWeather();
-  await sendTelegramMessage(telegram, buildDailyWeatherMessage(weather), { chatId });
+  const message = await buildWeatherReportMessage(openRouter, "current");
+  await sendTelegramMessage(telegram, message, { chatId });
 }
 
 export async function checkWarnings(

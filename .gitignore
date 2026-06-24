@@ -2,4 +2,7 @@
 .hkoweather_bot_state.json
 node_modules/
 dist/
+dist-worker/
 .wrangler/
+wrangler.ci.toml
+wrangler.ci.secrets.env

@@ -10,7 +10,8 @@
     "start:watch": "bun --watch src/runtime/docker/index.ts",
     "typecheck": "tsc --noEmit",
     "worker:dev": "wrangler dev",
-    "worker:deploy": "wrangler deploy"
+    "worker:deploy": "wrangler deploy",
+    "worker:deploy:ci": "node scripts/cloudflare-ci.mjs deploy"
   },
   "repository": {
     "type": "git",

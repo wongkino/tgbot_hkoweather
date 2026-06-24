@@ -1,5 +1,5 @@
 import { checkWarnings, sendDailyWeather } from "../../core/weather-bot";
-import type { StateStore, TelegramConfig } from "../../core/types";
+import type { OpenRouterConfig, StateStore, TelegramConfig } from "../../core/types";
 
 export function millisecondsUntilDailyRun(time: string): number {
   const [hourText, minuteText] = time.split(":", 2);
@@ -39,12 +39,13 @@ export function millisecondsUntilDailyRun(time: string): number {
 export function scheduleDailyWeather(
   telegram: TelegramConfig,
   dailyReportTime: string,
+  openRouter?: OpenRouterConfig,
 ): NodeJS.Timeout {
   let timer: NodeJS.Timeout;
 
   const scheduleNext = () => {
     timer = setTimeout(async () => {
-      await runSafely("daily weather report", () => sendDailyWeather(telegram));
+      await runSafely("daily weather report", () => sendDailyWeather(telegram, openRouter));
       scheduleNext();
     }, millisecondsUntilDailyRun(dailyReportTime));
   };

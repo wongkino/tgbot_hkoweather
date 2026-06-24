@@ -1,6 +1,6 @@
 import { sendCurrentWeather } from "./weather-bot";
 import { sendTelegramMessage } from "./telegram";
-import type { TelegramConfig, TelegramUpdate } from "./types";
+import type { OpenRouterConfig, TelegramConfig, TelegramUpdate } from "./types";
 
 const WEATHER_COMMANDS = new Set(["/weather", "/now"]);
 const WEATHER_BUTTON_TEXT = "現在天氣";
@@ -14,6 +14,7 @@ const MAIN_KEYBOARD = {
 export async function handleTelegramUpdate(
   telegram: TelegramConfig,
   update: TelegramUpdate,
+  openRouter?: OpenRouterConfig,
 ): Promise<boolean> {
   const message = update.message;
   if (!message?.text) {
@@ -26,7 +27,7 @@ export async function handleTelegramUpdate(
   }
 
   if (isWeatherCommand(text) || text === WEATHER_BUTTON_TEXT.toLowerCase()) {
-    await sendCurrentWeather(telegram, message.chat.id);
+    await sendCurrentWeather(telegram, message.chat.id, openRouter);
     return true;
   }
 
@@ -57,7 +58,9 @@ function buildHelpMessage(): string {
     `按「${WEATHER_BUTTON_TEXT}」即可立即取得現在天氣。`,
     "",
     "也可輸入：",
-    "/weather 或 /now - 立即取得現在天氣",
+    "/weather 或 /now - 立即取得天氣分析",
     "/help - 顯示此說明和鍵盤",
+    "",
+    "若已設定 OpenRouter，天氣報告會由免費 AI 模型分析生成。",
   ].join("\n");
 }

@@ -20,6 +20,7 @@ jobs:
       HKO_BOT_STATE_KV_NAMESPACE_NAME: tgbot_hkoweather
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
 
     steps:
@@ -49,72 +50,5 @@ jobs:
           test -n "$TELEGRAM_BOT_TOKEN"
           test -n "$TELEGRAM_CHAT_ID"
 
-      - name: Ensure KV namespace
-        id: kv-namespace
-        run: |
-          get_namespace_id() {
-            bun -e '
-              const fs = require("node:fs");
-              const namespaceName = process.argv[1];
-              const namespaces = JSON.parse(fs.readFileSync(0, "utf8"));
-              const namespace = namespaces.find((item) => item.title === namespaceName);
-              process.stdout.write(namespace?.id ?? "");
-            ' "$HKO_BOT_STATE_KV_NAMESPACE_NAME"
-          }
-
-          kv_id="$(bunx wrangler kv namespace list | get_namespace_id)"
-          if [ -z "$kv_id" ]; then
-            bunx wrangler kv namespace create "$HKO_BOT_STATE_KV_NAMESPACE_NAME" --binding HKO_BOT_STATE
-            kv_id="$(bunx wrangler kv namespace list | get_namespace_id)"
-          fi
-
-          if [ -z "$kv_id" ]; then
-            echo "Unable to determine KV namespace id for ${HKO_BOT_STATE_KV_NAMESPACE_NAME}." >&2
-            exit 1
-          fi
-
-          echo "id=$kv_id" >> "$GITHUB_OUTPUT"
-
-      - name: Generate webhook setup secret
-        id: webhook-setup-secret
-        run: |
-          secret="$(openssl rand -hex 32)"
-          echo "::add-mask::$secret"
-          echo "value=$secret" >> "$GITHUB_OUTPUT"
-
-      - name: Generate Wrangler CI config
-        run: |
-          sed "s/replace_with_your_kv_namespace_id/${{ steps.kv-namespace.outputs.id }}/" wrangler.toml > wrangler.ci.toml
-
-      - name: Deploy Worker
-        run: |
-          bunx wrangler deploy --config wrangler.ci.toml
-
-      - name: Sync Worker secrets
-        run: |
-          printf '%s' "$TELEGRAM_BOT_TOKEN" | bunx wrangler secret put TELEGRAM_BOT_TOKEN --config wrangler.ci.toml
-          printf '%s' "$TELEGRAM_CHAT_ID" | bunx wrangler secret put TELEGRAM_CHAT_ID --config wrangler.ci.toml
-          printf '%s' "${{ steps.webhook-setup-secret.outputs.value }}" | bunx wrangler secret put TELEGRAM_WEBHOOK_SETUP_SECRET --config wrangler.ci.toml
-          if [ -n "$TELEGRAM_WEBHOOK_SECRET" ]; then
-            printf '%s' "$TELEGRAM_WEBHOOK_SECRET" | bunx wrangler secret put TELEGRAM_WEBHOOK_SECRET --config wrangler.ci.toml
-          fi
-
-      - name: Redeploy Worker with synced secrets
-        id: deploy
-        run: |
-          bunx wrangler deploy --config wrangler.ci.toml 2>&1 | tee wrangler-deploy.log
-          worker_url="$(awk 'match($0, /https:\/\/[^[:space:]]+\.workers\.dev/) { url=substr($0, RSTART, RLENGTH) } END { print url }' wrangler-deploy.log)"
-          if [ -z "$worker_url" ]; then
-            echo "Unable to determine Worker URL from Wrangler output." >&2
-            exit 1
-          fi
-          echo "worker_url=$worker_url" >> "$GITHUB_OUTPUT"
-
-      - name: Set Telegram webhook
-        run: |
-          curl --fail-with-body \
-            --request POST \
-            --header "authorization: Bearer ${{ steps.webhook-setup-secret.outputs.value }}" \
-            --header "content-type: application/json" \
-            --data "{}" \
-            "${{ steps.deploy.outputs.worker_url }}/telegram/set-webhook"
+      - name: Deploy Worker and configure Telegram webhook
+        run: node scripts/cloudflare-ci.mjs deploy

@@ -1,12 +1,14 @@
 import { handleTelegramUpdate } from "../../core/commands";
 import { checkWarnings, sendDailyWeather } from "../../core/weather-bot";
-import type { StateStore, TelegramConfig, TelegramUpdate } from "../../core/types";
+import type { OpenRouterConfig, StateStore, TelegramConfig, TelegramUpdate } from "../../core/types";
 
 interface Env {
   TELEGRAM_BOT_TOKEN: string;
   TELEGRAM_CHAT_ID: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
   TELEGRAM_WEBHOOK_SETUP_SECRET?: string;
+  OPENROUTER_API_KEY?: string;
+  OPENROUTER_MODEL?: string;
   HKO_BOT_STATE: KVNamespace;
 }
 
@@ -30,7 +32,7 @@ export default {
       }
 
       const update = (await request.json()) as TelegramUpdate;
-      ctx.waitUntil(handleTelegramUpdate(telegramConfig(env), update));
+      ctx.waitUntil(handleTelegramUpdate(telegramConfig(env), update, openRouterConfig(env)));
       return new Response("OK\n", {
         headers: { "content-type": "text/plain; charset=utf-8" },
       });
@@ -103,10 +105,11 @@ function jsonResponse(payload: unknown, status = 200): Response {
 
 async function handleScheduled(cron: string, env: Env): Promise<void> {
   const telegram = telegramConfig(env);
+  const openRouter = openRouterConfig(env);
   const state = kvStateStore(env.HKO_BOT_STATE);
 
   if (cron === "0 23 * * *") {
-    await sendDailyWeather(telegram);
+    await sendDailyWeather(telegram, openRouter);
     return;
   }
 
@@ -117,6 +120,18 @@ function telegramConfig(env: Env): TelegramConfig {
   return {
     botToken: env.TELEGRAM_BOT_TOKEN,
     chatId: env.TELEGRAM_CHAT_ID,
+  };
+}
+
+function openRouterConfig(env: Env): OpenRouterConfig | undefined {
+  const apiKey = env.OPENROUTER_API_KEY?.trim();
+  if (!apiKey) {
+    return undefined;
+  }
+
+  return {
+    apiKey,
+    model: env.OPENROUTER_MODEL?.trim() || "openrouter/free",
   };
 }
 

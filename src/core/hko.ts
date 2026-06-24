@@ -1,4 +1,10 @@
-import type { CurrentWeather, WarningSnapshot } from "./types";
+import type {
+  CurrentWeather,
+  DailyWeatherContext,
+  DayForecast,
+  LocalForecast,
+  WarningSnapshot,
+} from "./types";
 
 const HKO_BASE_URL = "https://data.weather.gov.hk/weatherAPI/opendata/weather.php";
 
@@ -74,6 +80,100 @@ export async function getWarningSnapshot(): Promise<WarningSnapshot> {
     message: lines.join("\n").trim(),
     hasNotification: signatureParts.length > 0,
   };
+}
+
+export async function getLocalForecast(): Promise<LocalForecast> {
+  const data = await hkoJson<Record<string, unknown>>("flw");
+
+  return {
+    generalSituation: String(data.generalSituation || "").trim(),
+    tcInfo: String(data.tcInfo || "").trim(),
+    forecastPeriod: String(data.forecastPeriod || "").trim(),
+    forecastDesc: String(data.forecastDesc || "").trim(),
+    outlook: String(data.outlook || "").trim(),
+    updateTime: formatUpdateTime(data.updateTime),
+  };
+}
+
+export async function getTodayDayForecast(): Promise<DayForecast | null> {
+  const data = await hkoJson<Record<string, unknown>>("fnd");
+  const forecasts = Array.isArray(data.weatherForecast) ? data.weatherForecast : [];
+  const today = todayInHongKong();
+
+  for (const raw of forecasts) {
+    const item = asRecord(raw);
+    if (!item || String(item.forecastDate || "") !== today) {
+      continue;
+    }
+
+    return formatDayForecast(item);
+  }
+
+  const first = asRecord(forecasts[0]);
+  return first ? formatDayForecast(first) : null;
+}
+
+export async function getDailyWeatherContext(): Promise<DailyWeatherContext> {
+  const [current, localForecast, todayForecast, warnings] = await Promise.all([
+    getCurrentWeather(),
+    getLocalForecast(),
+    getTodayDayForecast(),
+    getWarningSnapshot(),
+  ]);
+
+  return {
+    current,
+    localForecast,
+    todayForecast,
+    warnings,
+  };
+}
+
+function formatDayForecast(item: Record<string, unknown>): DayForecast {
+  const maxTemp = asRecord(item.forecastMaxtemp);
+  const minTemp = asRecord(item.forecastMintemp);
+  const maxRh = asRecord(item.forecastMaxrh);
+  const minRh = asRecord(item.forecastMinrh);
+
+  return {
+    date: String(item.forecastDate || ""),
+    week: String(item.week || ""),
+    weather: String(item.forecastWeather || "").trim(),
+    minTemp: formatTempValue(minTemp),
+    maxTemp: formatTempValue(maxTemp),
+    minRh: formatPercentValue(minRh),
+    maxRh: formatPercentValue(maxRh),
+    wind: String(item.forecastWind || "").trim(),
+    rainProbability: String(item.PSR || "").trim(),
+  };
+}
+
+function formatTempValue(record: Record<string, unknown> | undefined): string {
+  if (!record || record.value === undefined || record.value === null) {
+    return "未能取得";
+  }
+
+  return `${String(record.value)}°${String(record.unit || "C")}`;
+}
+
+function formatPercentValue(record: Record<string, unknown> | undefined): string {
+  if (!record || record.value === undefined || record.value === null) {
+    return "未能取得";
+  }
+
+  const unit = String(record.unit || "percent");
+  return unit === "percent" ? `${String(record.value)}%` : `${String(record.value)}${unit}`;
+}
+
+function todayInHongKong(): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Hong_Kong",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  return formatter.format(new Date()).replace(/-/g, "");
 }
 
 async function hkoJson<T>(dataType: string): Promise<T> {

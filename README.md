@@ -2,7 +2,7 @@
 
 一個使用香港天文台 Open Data API 的 Telegram bot，以 Bun + TypeScript 開發：
 
-- 每日香港時間 07:00 發送即時天氣報告
+- 每日香港時間 07:00 發送即時天氣報告（可選用 OpenRouter 免費模型生成 AI 分析）
 - 定期輪詢香港天文台天氣警告
 - 有新警告、警告內容更新或警告取消時，即時傳送 Telegram 訊息
 - 支援 Telegram Reply Keyboard / 指令手動查詢現在天氣
@@ -19,6 +19,7 @@
 - Bun
 - Telegram bot token
 - 你的 Telegram chat id
+- OpenRouter API key（選填；設定後每日報告與手動查詢會使用免費 AI 模型分析天氣）
 - Cloudflare 用法：Wrangler、Cloudflare KV namespace
 - Docker 用法：Docker 或 Docker Compose
 
@@ -47,6 +48,7 @@ bun run typecheck
 src/
   core/                 # 共用 bot 邏輯，Cloudflare 與 Docker 都會使用
     hko.ts              # 香港天文台 Open Data API 讀取與格式化
+    openrouter.ts       # OpenRouter 免費模型天氣分析
     messages.ts         # Telegram 訊息內容
     telegram.ts         # Telegram Bot API 發送
     types.ts            # 共用型別與 state store 介面
@@ -62,6 +64,8 @@ src/
 | --- | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | 必填 | Telegram bot token |
 | `TELEGRAM_CHAT_ID` | 必填 | 接收訊息的 chat id |
+| `OPENROUTER_API_KEY` | 選填 | OpenRouter API key；設定後啟用 AI 天氣分析 |
+| `OPENROUTER_MODEL` | `openrouter/free` | OpenRouter 模型；預設使用免費模型路由器 |
 | `DAILY_REPORT_TIME` | `07:00` | Docker 長駐模式每日天氣報告時間，格式 `HH:MM`，香港時間 |
 | `WARNING_POLL_SECONDS` | `300` | Docker 長駐模式天氣警告輪詢秒數 |
 | `STATE_FILE` | `.hkoweather_bot_state.json` | Docker 長駐模式記錄上一個警告狀態 |
@@ -72,9 +76,9 @@ Bot 會提供 Reply Keyboard，按「現在天氣」即可立即推送天氣。
 
 | 按鈕 / 指令 | 說明 |
 | --- | --- |
-| `現在天氣` | 立即推送現在天氣 |
-| `/weather` | 立即推送現在天氣 |
-| `/now` | 立即推送現在天氣 |
+| `現在天氣` | 立即推送天氣分析（有 OpenRouter 時為 AI 分析） |
+| `/weather` | 立即推送天氣分析 |
+| `/now` | 立即推送天氣分析 |
 | `/help` | 顯示鍵盤與說明 |
 
 Docker / Bun 長駐模式會自動用 Telegram `getUpdates` 輪詢鍵盤訊息與指令。
@@ -86,6 +90,22 @@ weather - 立即取得現在天氣
 now - 立即取得現在天氣
 help - 顯示可用指令
 ```
+
+## OpenRouter AI 天氣分析
+
+設定 `OPENROUTER_API_KEY` 後，bot 會把香港天文台的現時天氣、本港預測、今日預報及生效警告送交 OpenRouter，由免費模型生成當日天氣報告。
+
+1. 到 [OpenRouter](https://openrouter.ai/) 註冊並建立 API key
+2. 在 `.env` 加入：
+
+   ```env
+   OPENROUTER_API_KEY=你的_api_key
+   OPENROUTER_MODEL=openrouter/free
+   ```
+
+3. 預設模型 `openrouter/free` 會自動選用 OpenRouter 上的免費模型；也可改為特定免費模型，例如 `meta-llama/llama-3.2-3b-instruct:free`
+
+若未設定 API key，bot 仍會發送原始天文台數據（與舊版行為相同）。若 AI 分析失敗，會自動退回原始報告。
 
 ## Bun Docker / Docker Compose
 
@@ -106,6 +126,7 @@ cp .env.example .env
 ```env
 TELEGRAM_BOT_TOKEN=123456789:replace_with_your_bot_token
 TELEGRAM_CHAT_ID=replace_with_your_chat_id
+OPENROUTER_API_KEY=replace_with_your_openrouter_api_key
 ```
 
 啟動：
@@ -199,6 +220,7 @@ HKO_BOT_STATE
 ```bash
 bunx wrangler secret put TELEGRAM_BOT_TOKEN
 bunx wrangler secret put TELEGRAM_CHAT_ID
+bunx wrangler secret put OPENROUTER_API_KEY
 ```
 
 ### GitHub Actions 自動部署
@@ -211,19 +233,14 @@ push 到 `main` 時會自動部署到 Cloudflare Workers。你需要先在 GitHu
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account id |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token，workflow 會寫入 Worker secret |
 | `TELEGRAM_CHAT_ID` | 接收訊息的 Telegram chat id，workflow 會寫入 Worker secret |
+| `OPENROUTER_API_KEY` | 選填；OpenRouter API key，workflow 會寫入 Worker secret |
 | `TELEGRAM_WEBHOOK_SECRET` | 選填；Telegram webhook secret token，設定後 Worker 會驗證 Telegram header |
 
 workflow 會執行：
 
 1. `bun install --frozen-lockfile`
 2. `bun run typecheck`
-3. 自動查找或建立 `tgbot_hkoweather` KV namespace
-4. 生成 CI 用 Wrangler config
-5. 自動產生臨時 `TELEGRAM_WEBHOOK_SETUP_SECRET`
-6. 部署 Worker 並自動讀取部署後的 `workers.dev` URL
-7. 用 `wrangler secret put` 更新 Telegram secrets
-8. 重新部署一次，確保 Worker 使用最新 secrets
-9. 呼叫 Worker 內置 `/telegram/set-webhook` endpoint，由 Worker 自己設定 Telegram webhook
+3. `node scripts/cloudflare-ci.mjs deploy`（自動建立 KV、部署 Worker、同步 secrets、設定 Telegram webhook）
 
 ### 設定 Telegram webhook
 

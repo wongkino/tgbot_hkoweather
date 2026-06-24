@@ -1,4 +1,5 @@
-import type { CurrentWeather, WarningSnapshot } from "./types";
+import type { DailyWeatherContext, CurrentWeather, WarningSnapshot } from "./types";
+import type { WeatherAnalysisMode } from "./openrouter";
 
 export function buildDailyWeatherMessage(weather: CurrentWeather): string {
   return [
@@ -12,6 +13,25 @@ export function buildDailyWeatherMessage(weather: CurrentWeather): string {
     "",
     "特別天氣提示：",
     weather.warningMessage,
+  ].join("\n");
+}
+
+export function buildAiWeatherMessage(
+  context: DailyWeatherContext,
+  analysis: string,
+  mode: WeatherAnalysisMode,
+): string {
+  const title = mode === "daily" ? "香港今日天氣報告" : "香港現時天氣分析";
+  const updateTime = context.current.updateTime;
+
+  return [
+    title,
+    `更新時間：${updateTime}`,
+    "",
+    analysis.trim(),
+    "",
+    "—",
+    "資料來源：香港天文台 · 分析由 OpenRouter 免費模型生成",
   ].join("\n");
 }
 

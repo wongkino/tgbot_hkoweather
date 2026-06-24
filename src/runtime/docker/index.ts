@@ -6,9 +6,13 @@ import { startTelegramCommandPolling } from "./telegram-poller";
 
 const config = loadDockerConfig();
 const state = new FileStateStore(config.stateFile);
-const dailyTimer = scheduleDailyWeather(config.telegram, config.dailyReportTime);
+const dailyTimer = scheduleDailyWeather(
+  config.telegram,
+  config.dailyReportTime,
+  config.openRouter,
+);
 const warningTimer = scheduleWarningPoll(config.telegram, state, config.warningPollSeconds);
-const commandPolling = startTelegramCommandPolling(config.telegram);
+const commandPolling = startTelegramCommandPolling(config.telegram, config.openRouter);
 
 console.log(
   [
@@ -18,6 +22,9 @@ console.log(
     "Telegram command polling enabled",
     `state file ${config.stateFile}`,
     `state key ${LAST_WARNING_SIGNATURE_KEY}`,
+    config.openRouter
+      ? `OpenRouter model ${config.openRouter.model}`
+      : "OpenRouter disabled (set OPENROUTER_API_KEY to enable AI reports)",
   ].join("; "),
 );
 

@@ -3,6 +3,11 @@ export interface TelegramConfig {
   chatId: string;
 }
 
+export interface OpenRouterConfig {
+  apiKey: string;
+  model: string;
+}
+
 export interface TelegramKeyboardButton {
   text: string;
 }
@@ -58,4 +63,32 @@ export interface WarningSnapshot {
   signature: string;
   message: string;
   hasNotification: boolean;
+}
+
+export interface LocalForecast {
+  generalSituation: string;
+  tcInfo: string;
+  forecastPeriod: string;
+  forecastDesc: string;
+  outlook: string;
+  updateTime: string;
+}
+
+export interface DayForecast {
+  date: string;
+  week: string;
+  weather: string;
+  minTemp: string;
+  maxTemp: string;
+  minRh: string;
+  maxRh: string;
+  wind: string;
+  rainProbability: string;
+}
+
+export interface DailyWeatherContext {
+  current: CurrentWeather;
+  localForecast: LocalForecast;
+  todayForecast: DayForecast | null;
+  warnings: WarningSnapshot;
 }
